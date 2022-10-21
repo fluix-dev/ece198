@@ -55,6 +55,44 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void SDA_1() {
+	HAL_GPIO_WritePin(SOFT_SDA_GPIO_Port, SOFT_SDA_Pin, 1);
+	//HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
+}
+void SCL_1() {
+	HAL_GPIO_WritePin(SOFT_SCL_GPIO_Port, SOFT_SCL_Pin, 1);
+	//HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
+}
+void SDA_0() {
+	HAL_GPIO_WritePin(SOFT_SDA_GPIO_Port, SOFT_SDA_Pin, 0);
+	//HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
+}
+void SCL_0() {
+	HAL_GPIO_WritePin(SOFT_SCL_GPIO_Port, SOFT_SCL_Pin, 0);
+	//HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
+}
+void SDA(int x) {
+	if (x) {
+		SDA_1();
+	} else {
+		SDA_0();
+	}
+}
+void I2C_Delay() {
+	HAL_Delay(1);
+}
+
+void I2C_Send_Byte(unsigned char x) {
+	for (int i = 7; i >= 0; --i) {
+		SDA(x & (1 << i));
+		I2C_Delay();
+		SCL_1();
+		I2C_Delay();
+		SCL_0();
+		I2C_Delay();
+		SDA(0);
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -95,6 +133,28 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+  for (int i = 0; i < 100; ++i) {
+	  I2C_Delay();
+  }
+	  SDA_1();
+	  SCL_1();
+	  I2C_Delay();
+	  SDA_0();
+	  I2C_Delay();
+	  SCL_0();
+	  I2C_Delay();
+	  I2C_Send_Byte(0b10110000);
+	  SDA(1);
+	  I2C_Delay();
+	  SCL_1();
+	  I2C_Delay();
+	  SCL_0();
+	  I2C_Delay();
+	  SDA_0();
+	  I2C_Delay();
+	  SCL_1();
+	  I2C_Delay();
+	  SDA_1();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -197,7 +257,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|SOFT_SDA_Pin|SOFT_SCL_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -205,12 +265,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  /*Configure GPIO pins : LD2_Pin SOFT_SDA_Pin SOFT_SCL_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin|SOFT_SDA_Pin|SOFT_SCL_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
