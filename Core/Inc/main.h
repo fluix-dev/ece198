@@ -67,6 +67,8 @@ void Error_Handler(void);
 #define USART_RX_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
+#define BUZ_Pin GPIO_PIN_6
+#define BUZ_GPIO_Port GPIOA
 #define SOFT_SDA_Pin GPIO_PIN_8
 #define SOFT_SDA_GPIO_Port GPIOA
 #define SOFT_SCL_Pin GPIO_PIN_9
@@ -75,8 +77,6 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
-#define BUZ_Pin GPIO_PIN_4
-#define BUZ_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

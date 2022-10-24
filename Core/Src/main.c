@@ -137,11 +137,6 @@ int main(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  for (int i = 0; i < 10; ++i) {
-  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 65535*(1.0/i));
-  HAL_Delay(500);
-  }
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -267,6 +262,7 @@ static void MX_TIM3_Init(void)
   }
   /* USER CODE BEGIN TIM3_Init 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  // __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period * 0.5);
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
 
@@ -318,7 +314,6 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|SOFT_SDA_Pin|SOFT_SCL_Pin, GPIO_PIN_RESET);
