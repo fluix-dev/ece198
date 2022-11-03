@@ -161,21 +161,45 @@ void I2C_Stop() {
 	SCL(1);
 }
 
+void Serial_Send(char *data) {
+	size_t len = strlen(data);
+	HAL_UART_Transmit(&huart2, (uint8_t*) data, len, HAL_MAX_DELAY);
+}
+
 void I2C_Read(size_t bytes) {
+	int read = 0;
+	Serial_Send("--------\r\n");
 	I2C_Send_Byte((TARGET_ADDRESS << 1) | I2C_READ);
 	SDA(1);
 	for (int i = 0; i < bytes; ++i) {
 		for (int bit = 0; bit < 8; ++bit) {
 			SCL(1);
-
+			if (HAL_GPIO_ReadPin(SOFT_SDA_GPIO_Port, SOFT_SDA_Pin)) {
+				Serial_Send("1");
+				read |= 1;
+				read <<= 1;
+			} else {
+				Serial_Send("0");
+				read <<= 1;
+			}
 			SCL(0);
 		}
+		Serial_Send("\r\n");
 		if (i < bytes - 1) {
 			I2C_ACK();
 		} else {
 			I2C_NACK();
 		}
 	}
+	if (read / 2 > 5000) {
+		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period);
+	} else {
+		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+	}
+	// NOTE: multiplication by 2 for some reason.
+	char str[64];
+	sprintf(str, "%d\r\n", read / 2);
+	Serial_Send(str);
 }
 /* USER CODE END 0 */
 
@@ -216,13 +240,19 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+	I2C_Init();
+	I2C_Start();
+	I2C_Write(INIT_AIR_QUALITY);
+	I2C_Stop();
+	HAL_Delay(15 * 1000);
 	while (1) {
-		I2C_Init();
+		//I2C_Init();
 		I2C_Start();
-		I2C_Write(GET_FEATURE_SET_VERSION);
+		I2C_Write(MEASURE_AIR_QUALITY);
 		I2C_Restart();
-		I2C_Read(3);
+		I2C_Read(2);
 		I2C_Stop();
+		HAL_Delay(1000);
 	}
 	/* USER CODE END WHILE */
 
@@ -364,10 +394,14 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_GPIOH_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOA, LD2_Pin | SOFT_SDA_Pin | SOFT_SCL_Pin,
+	HAL_GPIO_WritePin(GPIOA, LD2_Pin | SOFT_SCL_Pin | SOFT_SDA_Pin,
 			GPIO_PIN_RESET);
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin : B1_Pin */
 	GPIO_InitStruct.Pin = B1_Pin;
@@ -382,12 +416,19 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : SOFT_SDA_Pin SOFT_SCL_Pin */
-	GPIO_InitStruct.Pin = SOFT_SDA_Pin | SOFT_SCL_Pin;
+	/*Configure GPIO pins : SOFT_SCL_Pin SOFT_SDA_Pin */
+	GPIO_InitStruct.Pin = SOFT_SCL_Pin | SOFT_SDA_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : LED_Pin */
+	GPIO_InitStruct.Pin = LED_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
 }
 
