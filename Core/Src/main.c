@@ -18,11 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -238,10 +240,21 @@ int main(void) {
 	MX_USART2_UART_Init();
 	MX_SPI3_Init();
 	MX_TIM3_Init();
+	MX_FATFS_Init();
 	/* USER CODE BEGIN 2 */
-	char *data = "Hello, Board!\r\n";
-	size_t len = strlen(data);
-	HAL_UART_Transmit(&huart2, (uint8_t*) data, len, HAL_MAX_DELAY);
+	Serial_Send("Hello, Board!\r\n");
+	HAL_Delay(1000);
+	Serial_Send("Attempting to mount SD card.\r\n");
+	FATFS fs;
+	FRESULT fresult = f_mount(&fs, "", 1);
+	if (fresult != FR_OK) {
+		char str[64];
+		sprintf(str, "%d\r\n", fresult);
+		Serial_Send(str);
+		Serial_Send("Failure!\r\n");
+	} else {
+		Serial_Send("Success!\r\n");
+	}
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -331,7 +344,7 @@ static void MX_SPI3_Init(void) {
 	hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
 	hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
 	hspi3.Init.NSS = SPI_NSS_SOFT;
-	hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+	hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
 	hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
 	hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
 	hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -435,11 +448,15 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_GPIOH_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOD_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOA, LD2_Pin | SOFT_SCL_Pin | SOFT_SDA_Pin,
 			GPIO_PIN_RESET);
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
@@ -463,6 +480,13 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+	/*Configure GPIO pin : SPI3_CS_Pin */
+	GPIO_InitStruct.Pin = SPI3_CS_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(SPI3_CS_GPIO_Port, &GPIO_InitStruct);
 
 	/*Configure GPIO pin : LED_Pin */
 	GPIO_InitStruct.Pin = LED_Pin;
