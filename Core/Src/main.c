@@ -282,9 +282,9 @@ int main(void) {
 
 	// Delay before valid measurements.
 	for (int i = 0; i < 15; ++i) {
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
 		HAL_Delay(500);
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
 		HAL_Delay(500);
 	}
 
