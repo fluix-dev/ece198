@@ -75,12 +75,17 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define SPI3_CS_Pin GPIO_PIN_2
+#define SPI3_CS_GPIO_Port GPIOD
 #define LED_Pin GPIO_PIN_3
 #define LED_GPIO_Port GPIOB
 #define BUZ_Pin GPIO_PIN_4
 #define BUZ_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-
+#define SD_SPI_HANDLE hspi3
+// Same as SPI3_CS_* above
+#define SD_CS_GPIO_Port GPIOD
+#define SD_CS_Pin GPIO_PIN_2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
