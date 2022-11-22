@@ -46,6 +46,9 @@
 #define GET_FEATURE_SET_VERSION 0x202f
 #define MEASURE_RAW_SIGNALS 0x2050
 #define GET_SERIAL_ID 0x3682
+
+#define CO2_TRIGGER_LEVEL 30000
+#define TIME_RESET 800
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,7 +80,6 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void I2C_Delay() {
-	//HAL_Delay(1);
 	for (int i = 0; i < 5000; ++i)
 		__NOP();
 }
@@ -173,7 +175,7 @@ void Serial_Send(char *data) {
 	HAL_UART_Transmit(&huart2, (uint8_t*) data, len, HAL_MAX_DELAY);
 }
 
-void I2C_Read(size_t bytes) {
+unsigned int I2C_Read(size_t bytes) {
 	int read = 0;
 	Serial_Send("--------\r\n");
 	I2C_Send_Byte((TARGET_ADDRESS << 1) | I2C_READ);
@@ -198,16 +200,30 @@ void I2C_Read(size_t bytes) {
 			I2C_NACK();
 		}
 	}
-	if (read / 2 > 5000) {
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period);
-	} else {
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
-	}
+
 	// NOTE: multiplication by 2 for some reason.
 	char str[64];
 	sprintf(str, "%d\r\n", read / 2);
 	Serial_Send(str);
+	return read;
 }
+
+// Controls the buzzer.
+void Buzzer(unsigned int time, int co2) {
+	if (co2 > CO2_TRIGGER_LEVEL) {
+		if (time > TIME_RESET / 2) {
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period);
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+		} else {
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		}
+	} else {
+		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -263,15 +279,31 @@ int main(void) {
 	I2C_Start();
 	I2C_Write(INIT_AIR_QUALITY);
 	I2C_Stop();
-	HAL_Delay(15 * 1000);
+
+	// Delay before valid measurements.
+	for (int i = 0; i < 15; ++i) {
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+		HAL_Delay(500);
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		HAL_Delay(500);
+	}
+
+	unsigned int time = 0;
+	unsigned int co2 = 400;
 	while (1) {
-		//I2C_Init();
-		I2C_Start();
-		I2C_Write(MEASURE_AIR_QUALITY);
-		I2C_Restart();
-		I2C_Read(2);
-		I2C_Stop();
-		HAL_Delay(1000);
+		if (time % TIME_RESET == 0) {
+			I2C_Start();
+			I2C_Write(MEASURE_AIR_QUALITY);
+			I2C_Restart();
+			co2 = I2C_Read(2);
+			I2C_Stop();
+		}
+
+		Buzzer(time, co2);
+
+		HAL_Delay(1);
+		++time;
+		time %= TIME_RESET;
 	}
 	/* USER CODE END WHILE */
 
