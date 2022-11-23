@@ -49,6 +49,9 @@
 
 #define CO2_TRIGGER_LEVEL 30000
 #define TIME_RESET 800
+
+#define CRC8_INIT 0xff
+#define CRC8_POLYNOMIAL 0x31
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -175,11 +178,30 @@ void Serial_Send(char *data) {
 	HAL_UART_Transmit(&huart2, (uint8_t*) data, len, HAL_MAX_DELAY);
 }
 
-unsigned int I2C_Read(size_t bytes) {
-	int read = 0;
-	Serial_Send("--------\r\n");
+uint8_t crc8(uint8_t *data, size_t capacity) {
+	uint8_t crc = CRC8_INIT;
+	for (size_t i = 0; i < capacity; ++i) {
+		crc ^= data[i];
+		for (int j = 0; j < 8; ++j) {
+			if ((crc & (1 << 7))) {
+				crc <<= 1;
+				crc ^= CRC8_POLYNOMIAL;
+			} else {
+				crc <<= 1;
+			}
+		}
+	}
+	return crc;
+}
+
+// Reads bytes of data then reads one more byte for CRC checking.
+// Data is returned in the *data parameter which is guaranteed to
+// stay the same if the CRC was invalid.
+unsigned int I2C_Read(size_t bytes, unsigned int *data) {
+	Serial_Send("-------- BEGIN READ --------\r\n");
 	I2C_Send_Byte((TARGET_ADDRESS << 1) | I2C_READ);
 	SDA(1);
+	unsigned int read = 0;
 	for (int i = 0; i < bytes; ++i) {
 		for (int bit = 0; bit < 8; ++bit) {
 			SCL(1);
@@ -193,19 +215,45 @@ unsigned int I2C_Read(size_t bytes) {
 			}
 			SCL(0);
 		}
-		Serial_Send("\r\n");
-		if (i < bytes - 1) {
-			I2C_ACK();
-		} else {
-			I2C_NACK();
-		}
+		Serial_Send(" (read) \r\n");
+		I2C_ACK();
 	}
+	// NOTE: multiplication by 2 for some reason.
+	read /= 2;
+
+	unsigned int crc = 0;
+	for (int bit = 0; bit < 8; ++bit) {
+		SCL(1);
+		if (HAL_GPIO_ReadPin(SOFT_SDA_GPIO_Port, SOFT_SDA_Pin)) {
+			Serial_Send("1");
+			crc |= 1;
+			crc <<= 1;
+		} else {
+			Serial_Send("0");
+			crc <<= 1;
+		}
+		SCL(0);
+	}
+	I2C_NACK();
 
 	// NOTE: multiplication by 2 for some reason.
+	crc /= 2;
+	Serial_Send(" (crc) \r\n");
+
 	char str[64];
-	sprintf(str, "%d\r\n", read / 2);
+	sprintf(str, "%d (value)\r\n", *data);
 	Serial_Send(str);
-	return read;
+
+	// NOTE: Assumes 2 bytes of data are read.
+	uint8_t buf[2] = { read >> 8, read & 0xff };
+	if (crc8(buf, 2) != crc) {
+		Serial_Send("Bad CRC! \r\n");
+		return 1;
+	}
+
+	// Only update value on valid CRC.
+	*data = read;
+	return 0;
 }
 
 // Controls the buzzer.
@@ -282,9 +330,9 @@ int main(void) {
 
 	// Delay before valid measurements.
 	for (int i = 0; i < 15; ++i) {
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
 		HAL_Delay(500);
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
 		HAL_Delay(500);
 	}
 
@@ -295,7 +343,7 @@ int main(void) {
 			I2C_Start();
 			I2C_Write(MEASURE_AIR_QUALITY);
 			I2C_Restart();
-			co2 = I2C_Read(2);
+			I2C_Read(2, &co2);
 			I2C_Stop();
 		}
 
