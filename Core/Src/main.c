@@ -47,8 +47,9 @@
 #define MEASURE_RAW_SIGNALS 0x2050
 #define GET_SERIAL_ID 0x3682
 
-#define CO2_TRIGGER_LEVEL 30000
-#define TIME_RESET 800
+#define CO2_TRIGGER_LEVEL 1000
+#define MAINTENANCE_TRIGGER 5
+#define TIME_RESET 5000
 
 #define CRC8_INIT 0xff
 #define CRC8_POLYNOMIAL 0x31
@@ -247,7 +248,7 @@ unsigned int I2C_Read(size_t bytes, unsigned int *data) {
 	// NOTE: Assumes 2 bytes of data are read.
 	uint8_t buf[2] = { read >> 8, read & 0xff };
 	if (crc8(buf, 2) != crc) {
-		Serial_Send("Bad CRC! \r\n");
+		Serial_Send("Bad CRC!\r\n");
 		return 1;
 	}
 
@@ -257,9 +258,9 @@ unsigned int I2C_Read(size_t bytes, unsigned int *data) {
 }
 
 // Controls the buzzer.
-void Buzzer(unsigned int time, int co2) {
+void Buzzer(unsigned int time, unsigned int co2, unsigned int badcrc) {
 	if (co2 > CO2_TRIGGER_LEVEL) {
-		if (time > TIME_RESET / 2) {
+		if (time % 800 < 400) {
 			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period);
 			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
 		} else {
@@ -267,8 +268,17 @@ void Buzzer(unsigned int time, int co2) {
 			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
 		}
 	} else {
-		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		if (badcrc > MAINTENANCE_TRIGGER) {
+			if (time < TIME_RESET / 10 || (time > TIME_RESET / 2 && time < TIME_RESET / 2 + TIME_RESET / 10)) {
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period);
+			} else {
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+			}
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		} else {
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+		}
 	}
 }
 
@@ -338,16 +348,21 @@ int main(void) {
 
 	unsigned int time = 0;
 	unsigned int co2 = 400;
+	unsigned int badcrc = 0;
 	while (1) {
-		if (time % TIME_RESET == 0) {
+		if (time % (TIME_RESET / 10) == 0) {
 			I2C_Start();
 			I2C_Write(MEASURE_AIR_QUALITY);
 			I2C_Restart();
-			I2C_Read(2, &co2);
+			if (I2C_Read(2, &co2)) {
+				++badcrc;
+			} else {
+				badcrc = 0;
+			}
 			I2C_Stop();
 		}
 
-		Buzzer(time, co2);
+		Buzzer(time, co2, badcrc);
 
 		HAL_Delay(1);
 		++time;
