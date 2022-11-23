@@ -325,9 +325,20 @@ int main(void) {
 		char str[64];
 		sprintf(str, "%d\r\n", fresult);
 		Serial_Send(str);
-		Serial_Send("Failure!\r\n");
+		Serial_Send("Failure mounting!\r\n");
 	} else {
-		Serial_Send("Success!\r\n");
+		Serial_Send("Success mounting!\r\n");
+	}
+
+	FIL fil;
+	fresult = f_open(&fil, "log.txt", FA_WRITE | FA_OPEN_APPEND | FA_CREATE_ALWAYS);
+	if (fresult != FR_OK) {
+		char str[64];
+		sprintf(str, "%d\r\n", fresult);
+		Serial_Send(str);
+		Serial_Send("Failure opening!\r\n");
+	} else {
+		Serial_Send("Success opening!\r\n");
 	}
 	/* USER CODE END 2 */
 
@@ -346,6 +357,7 @@ int main(void) {
 		HAL_Delay(500);
 	}
 
+	unsigned int all_time = 0;
 	unsigned int time = 0;
 	unsigned int co2 = 400;
 	unsigned int badcrc = 0;
@@ -358,6 +370,19 @@ int main(void) {
 				++badcrc;
 			} else {
 				badcrc = 0;
+
+				UINT bytesWrote;
+				BYTE str[35];
+				sprintf(str, "%15d,%15d\r\n", all_time, co2);
+				fresult = f_write(&fil, str, 35, &bytesWrote);
+				if (fresult == FR_OK) {
+					Serial_Send("Wrote bytes");
+				} else {
+					char str[64];
+					sprintf(str, "%d\r\n", fresult);
+					Serial_Send(str);
+					Serial_Send("Failed");
+				}
 			}
 			I2C_Stop();
 		}
@@ -366,8 +391,25 @@ int main(void) {
 
 		HAL_Delay(1);
 		++time;
+		++all_time;
 		time %= TIME_RESET;
+		if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET) {
+			Serial_Send("Goodbye!");
+			for (int i = 0; i < 3; ++i) {
+				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period);
+				HAL_Delay(50);
+
+				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
+				__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+				HAL_Delay(50);
+			}
+			break;
+		}
 	}
+
+	f_close(&fil);
+	f_mount(NULL, "", 0);
 	/* USER CODE END WHILE */
 
 	/* USER CODE BEGIN 3 */
